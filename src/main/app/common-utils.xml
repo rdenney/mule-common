@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    <sub-flow name="setCorrelationId">
+        <choice doc:name="Choice">
+            <when expression=" message.correlationId == null">
+                <set-property propertyName="MULE_CORRELATION_ID" value="#[message.id]" doc:name="Set New CorrelationID"/>
+            </when>
+            <otherwise>
+                <set-property propertyName="MULE_CORRELATION_ID" value="#[message.correlationId]" doc:name="Retain Existing CorrelationID"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    <flow name="preserveOriginalMessage">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="vm.preserve.message" doc:name="vm.preserve.message">
+            <ee:multi-transaction action="ALWAYS_BEGIN"/>
+        </vm:inbound-endpoint>
+        <logger message="{&quot;message&quot;:&quot;Attempting to persist original message&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageTrace" doc:name="Copy_of_Logger"/>
+        <catch-exception-strategy doc:name="Copy_of_Catch Exception Strategy">
+            <logger message="{&quot;message&quot;:&quot;Persisting Original Message failed to publish. Writing message details to logs&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageTrace" doc:name="Logger"/>
+            <logger message="{&quot;message&quot;:&quot;#[message]&quot;, &quot;payload&quot;: &quot;#[message.payloadAs(java.lang.String)]&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageDump" doc:name="Copy_of_Logger"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="errorPublisher">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="vm.error.publisher" doc:name="vm.error.publisher"/>
+        <logger message="{&quot;message&quot;:&quot;Attempting to publish error to error handling service / queue&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageTrace" doc:name="Logger"/>
+<!--         <logger message="#[/]" level="INFO" doc:name="Break It"/> -->
+        <logger message="{&quot;message&quot;:&quot;Successfully published error message&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageTrace" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="{&quot;message&quot;:&quot;Error Message failed to publish. Writing message details to logs&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageTrace" doc:name="Logger"/>
+            <logger message="{&quot;message&quot;:&quot;#[message]&quot;, &quot;payload&quot;: &quot;#[message.payloadAs(java.lang.String)]&quot;, &quot;CID&quot;: &quot;#[message.correlationId]&quot;, &quot;applicationName&quot;:&quot;#[app.name]&quot;, &quot;flowName&quot;:&quot;#[flow.name]&quot;, &quot;http.method&quot;:&quot;#[message.inboundProperties.'http.method']&quot;, &quot;http.request.uri&quot;:&quot;#[message.inboundProperties.'http.request.uri']&quot;}" level="INFO" category="messageDump" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>
